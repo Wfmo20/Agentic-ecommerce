@@ -1,0 +1,17 @@
+# Secretos: nunca al repositorio (se sube solo .env.example)
+.env
+
+# Entorno virtual y cachés de Python / pytest / LangGraph
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.langgraph_api/
+
+# Datos y archivos locales
+data/
+*.db
+*.sqlite
+*.sqlite3
+*.log
+github-test.txt
