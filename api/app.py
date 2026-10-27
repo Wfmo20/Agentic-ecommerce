@@ -69,8 +69,7 @@ class ChatResponse(BaseModel):
     )
     respuesta: str = Field(
         description="Respuesta del agente destino para el cliente.",
-        examples=["Soy el agente de preventa. Recibí: ¿tienen la polera azul en talla M?. "
-                  "Pronto podré ayudarte con productos y compras."],
+        examples=["¡Hola! Déjame consultar el stock de la polera azul en talla M. ¿Buscas algún modelo en particular?"],
     )
 
 

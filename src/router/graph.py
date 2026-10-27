@@ -1,7 +1,7 @@
 """Agente router del chat de un ecommerce: decide si el mensaje va a preventa, postventa o genérica.
 
-Flujo:  START → router ─┬→ agente_preventa    → END
-                        ├→ agente_postventa   → END
+Flujo:  START → router ─┬→ agente_preventa    → END   (Gemini, prompt de vendedor)
+                        ├→ agente_postventa   → END   (Gemini, prompt de soporte)
                         └→ respuesta_generica → END
 """
 import os
@@ -49,14 +49,18 @@ def router(estado: Estado) -> dict:
     }
 
 
-def agente_preventa(estado: Estado) -> dict:
-    respuesta = PROMPT_PREVENTA.format(mensaje=estado["mensaje"])
+def responder_con(prompt: str, estado: Estado) -> dict:
+    # "messages" ya trae el historial del hilo más el mensaje actual (lo agregó el router).
+    respuesta = llm.invoke([SystemMessage(prompt), *estado["messages"]]).text
     return {"respuesta": respuesta, "messages": [AIMessage(respuesta)]}
+
+
+def agente_preventa(estado: Estado) -> dict:
+    return responder_con(PROMPT_PREVENTA, estado)
 
 
 def agente_postventa(estado: Estado) -> dict:
-    respuesta = PROMPT_POSTVENTA.format(mensaje=estado["mensaje"])
-    return {"respuesta": respuesta, "messages": [AIMessage(respuesta)]}
+    return responder_con(PROMPT_POSTVENTA, estado)
 
 
 def respuesta_generica(estado: Estado) -> dict:

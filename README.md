@@ -9,7 +9,7 @@ estructurada) que decide a qué agente va y por qué:
 | `postventa` | Ya compró: reclamo, seguimiento de un pedido, devolución, cambio, garantía o producto dañado. | `agente_postventa` |
 | `generica` | No tiene que ver con la tienda (clima, chistes, hora…) o es un saludo sin pedido. | `respuesta_generica` |
 
-Por ahora los agentes destino son **cascarones** (confirman que el mensaje llegó al lugar correcto).
+Preventa y postventa responden con Gemini, cada uno con su propio prompt, sin inventar stock, precios ni estados de pedido.
 El router se expone como API (FastAPI), se despliega en **Heroku** y se conecta a un bot de **Telegram**.
 Reglas del proyecto en [AGENTS.md](AGENTS.md).
 
@@ -91,7 +91,7 @@ Respuesta:
 {
   "ruta": "preventa",
   "motivo": "El cliente pregunta por la disponibilidad de un producto y su talla antes de comprar.",
-  "respuesta": "Soy el agente de preventa. Recibí: ¿tienen la polera azul en talla M?. Pronto podré ayudarte con productos y compras."
+  "respuesta": "¡Hola! Déjame consultar el stock de la polera azul en talla M. ¿Buscas algún modelo en particular?"
 }
 ```
 
