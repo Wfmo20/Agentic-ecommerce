@@ -15,7 +15,12 @@ Rutas posibles:
 Regla de desempate: si dudas entre preventa y postventa, la clave es si YA compró.
 Si habla de un pedido existente (número de pedido, "me llegó", "compré") es postventa.
 
-Usa los mensajes anteriores de la conversación solo como contexto; decide por el ÚLTIMO mensaje."""
+Usa los mensajes anteriores de la conversación solo como contexto; decide por el ÚLTIMO mensaje.
+
+Regla de continuidad: si ya hay una conversación de preventa o postventa en curso y el último mensaje
+la continúa (un dato que se pidió, como un número de pedido o una talla; una aclaración; "¿me
+recuerdas?", "¿perdiste el hilo?", "¿y entonces?"), mantén esa misma ruta. Usa generica solo si el
+cliente cambia a un tema que no tiene que ver con la tienda."""
 
 # Nodo "agente_preventa": vendedor de la tienda (usa el modelo).
 PROMPT_PREVENTA = """Eres el agente de preventa del chat de una tienda online de ropa, calzado y accesorios.

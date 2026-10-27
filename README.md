@@ -10,8 +10,15 @@ estructurada) que decide a qué agente va y por qué:
 | `generica` | No tiene que ver con la tienda (clima, chistes, hora…) o es un saludo sin pedido. | `respuesta_generica` |
 
 Preventa y postventa responden con Gemini, cada uno con su propio prompt, sin inventar stock, precios ni estados de pedido.
-El router se expone como API (FastAPI), se despliega en **Heroku** y se conecta a un bot de **Telegram**.
+El router se expone como API (FastAPI), se despliega en **Render** y se conecta a un bot de **Telegram**.
 Reglas del proyecto en [AGENTS.md](AGENTS.md).
+
+**En vivo:**
+- API: https://agentic-ecommerce-elvj.onrender.com/docs
+- Bot de Telegram: [@wilf_mo_bot](https://t.me/wilf_mo_bot)
+
+> Se usa Render (plan gratis) en vez de Heroku, que ya no tiene plan gratis y no acepta tarjetas prepago.
+> En el plan gratis la app se duerme tras ~15 min sin uso: la primera respuesta puede tardar ~50 s.
 
 ```
 src/router/        graph.py · prompts.py · tools.py     ← el agente
@@ -19,8 +26,8 @@ api/app.py         API FastAPI (/health, /chat, /telegram)
 main.py            ejecutar agentes por consola
 scripts/           probar_router.py · test_router.py
 tests/             pytest + casos_router.json (15 casos)
-bruno/             colección de requests (local ↔ Heroku)
-Procfile · .python-version · requirements.txt        ← Heroku
+bruno/             colección de requests (local ↔ Render)
+Procfile · .python-version · requirements.txt        ← despliegue
 ```
 
 ## 1. Preparar
@@ -42,7 +49,7 @@ Completa `.env` (nunca lo subas al repositorio):
 | `MODELO` | Modelo del router (`gemini-3.5-flash-lite`) | Desde el inicio |
 | `TELEGRAM_TOKEN` | Token del bot, lo entrega BotFather | Paso de Telegram |
 | `TELEGRAM_SECRET` | Secreto que Telegram envía en cada webhook para que la API lo verifique | Paso de Telegram |
-| `PUBLIC_URL` | URL https pública de la app (la de Heroku) | Después de desplegar |
+| `PUBLIC_URL` | URL https pública de la app (la de Render) | Después de desplegar |
 
 ## 2. Correr el router en local (consola)
 
@@ -95,7 +102,7 @@ Respuesta:
 }
 ```
 
-**Bruno (opcional):** Open Collection → carpeta `bruno/`; entorno `local` o `heroku` (arriba a la derecha).
+**Bruno (opcional):** Open Collection → carpeta `bruno/`; entorno `local` o `render` (arriba a la derecha).
 
 ## 4. Correr las pruebas
 
@@ -110,32 +117,39 @@ python scripts/probar_router.py     # los 6 mensajes de ejemplo con su ruta
 - `tests/test_api.py`: `/health`, 422, 502 sin filtrar secretos, `/telegram` y un `/chat` real.
 - Las pruebas que llaman al modelo se saltan si no hay `GOOGLE_API_KEY`.
 
-## 5. Desplegar en Heroku
+## 5. Desplegar en Render
 
-Requisitos: cuenta en Heroku y [Heroku CLI](https://devcenter.heroku.com/articles/heroku-cli) instalada.
-Heroku usa el `Procfile` (`web: uvicorn api.app:app --host 0.0.0.0 --port $PORT`), `.python-version` (`3.12`)
-y `requirements.txt`. Después de instalar un paquete nuevo: `pip freeze > requirements.txt`.
+Todo se hace desde el panel web de [Render](https://render.com) (plan **Free**, no pide tarjeta). Render instala
+`requirements.txt` con Python `3.12` (lo lee de `.python-version`). Después de instalar un paquete nuevo:
+`pip freeze > requirements.txt`.
 
-```powershell
-heroku login
-heroku create NOMBRE-DE-TU-APP
-heroku config:set GOOGLE_API_KEY=tu_clave MODELO=gemini-3.5-flash-lite TELEGRAM_SECRET=un_secreto_largo
-git push heroku main
-heroku apps:info                    # copia la "Web URL" (https://...herokuapp.com)
-heroku config:set PUBLIC_URL=https://LA-WEB-URL-DE-TU-APP.herokuapp.com
-heroku logs --tail                  # ver el log en vivo (Ctrl + C para salir)
-```
+1. Entra con **Sign in with GitHub** → **+ New** → **Web Service** → elige este repositorio.
+2. Configura:
 
-Prueba: `https://LA-WEB-URL-DE-TU-APP.herokuapp.com/health` y `/docs`.
-En Bruno, cambia `TU-APP` en `bruno/environments/heroku.bru` y elige el entorno `heroku`.
+   | Campo | Valor |
+   |---|---|
+   | Language | `Python 3` |
+   | Branch | `main` |
+   | Build Command | `pip install -r requirements.txt` |
+   | Start Command | `uvicorn api.app:app --host 0.0.0.0 --port $PORT` (el mismo del `Procfile`) |
+   | Instance Type | **Free** |
+
+3. En **Environment Variables** agrega `GOOGLE_API_KEY` y `MODELO` (el nombre en **KEY** y el valor en
+   **VALUE**) → **Deploy Web Service**.
+4. Cuando diga **Live**, copia la URL (`https://NOMBRE-xxxx.onrender.com`, debajo del nombre del servicio)
+   y agrégala como `PUBLIC_URL` en **Environment**.
+
+Prueba: `https://NOMBRE-xxxx.onrender.com/health` y `/docs`. En Bruno, elige el entorno `render`.
+Cada `git push` a `main` vuelve a desplegar solo; los errores se ven en **Logs**.
+
+> La memoria de las conversaciones (`MemorySaver`) vive en la RAM del servidor: se borra cuando Render
+> duerme la app o la vuelve a desplegar.
 
 ## 6. Conectar Telegram
 
 1. En Telegram, habla con **@BotFather** → `/newbot` → elige nombre y usuario → copia el **token**.
-2. Guárdalo en Heroku (y en tu `.env` si pruebas en local):
-   ```powershell
-   heroku config:set TELEGRAM_TOKEN=el_token_de_botfather
-   ```
+2. Guárdalo en tu `.env` y en Render (**Environment**) junto con el secreto: `TELEGRAM_TOKEN` y
+   `TELEGRAM_SECRET` (una frase larga con letras, números, `-` o `_`). Guarda con **Save, rebuild, and deploy**.
 3. Registra el webhook: Telegram enviará cada mensaje a `PUBLIC_URL/telegram`, con el header
    `X-Telegram-Bot-Api-Secret-Token` igual a `TELEGRAM_SECRET`, para que la API verifique que viene de Telegram.
    Git Bash / macOS / Linux:
