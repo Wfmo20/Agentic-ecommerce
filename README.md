@@ -151,5 +151,6 @@ En Bruno, cambia `TU-APP` en `bruno/environments/heroku.bru` y elige el entorno 
    ```
 4. Revisa que quedó registrado: `https://api.telegram.org/bot<TELEGRAM_TOKEN>/getWebhookInfo`.
 
-> **Estado actual:** `/telegram` recibe el webhook y responde `{"ok": true}`. Verificar el secreto,
-> pasar el texto por el router y contestarle al usuario en Telegram se completa en la **parte 5**.
+> **Cómo funciona `/telegram`:** rechaza con **403** si el header `X-Telegram-Bot-Api-Secret-Token` no
+> coincide con `TELEGRAM_SECRET`; si el mensaje trae texto, lo pasa por el router (hilo `telegram-<chat_id>`)
+> y le contesta al usuario con `sendMessage`. Stickers, fotos y otros mensajes sin texto se ignoran.

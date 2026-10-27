@@ -3,13 +3,15 @@
 Levantar (desde la raíz):  uvicorn api.app:app --reload --port 8000
 Documentación interactiva:  http://localhost:8000/docs
 """
+import hmac
 import logging
 import os
 from contextlib import asynccontextmanager
 from typing import Any, Literal
 
+import httpx
 from dotenv import load_dotenv
-from fastapi import Body, FastAPI, HTTPException, Request
+from fastapi import Body, FastAPI, Header, HTTPException, Request
 from pydantic import BaseModel, Field
 
 load_dotenv()
@@ -33,7 +35,7 @@ La conversación se recuerda por `user_id` (cada usuario tiene su propio hilo de
 TAGS = [
     {"name": "salud", "description": "Revisar que la API está arriba y qué modelo usa."},
     {"name": "chat", "description": "Enviar un mensaje del cliente y obtener la ruta, el motivo y la respuesta."},
-    {"name": "telegram", "description": "Webhook de Telegram (se completa en la parte 5)."},
+    {"name": "telegram", "description": "Webhook de Telegram: verifica el secreto, pasa el texto por el router y le contesta al usuario."},
 ]
 
 
@@ -127,7 +129,46 @@ def chat(pedido: ChatRequest, request: Request) -> ChatResponse:
     return ChatResponse(ruta=estado["ruta"], motivo=estado["motivo"], respuesta=estado["respuesta"])
 
 
+def enviar_a_telegram(chat_id: int, texto: str) -> None:
+    """Le contesta al usuario en Telegram (sendMessage de la Bot API)."""
+    token = os.environ.get("TELEGRAM_TOKEN", "")
+    try:
+        r = httpx.post(
+            f"https://api.telegram.org/bot{token}/sendMessage",
+            json={"chat_id": chat_id, "text": texto},
+            timeout=15,
+        )
+        r.raise_for_status()
+    except httpx.HTTPError:
+        # No se loguea la excepción completa: su mensaje incluye la URL con el token.
+        log.error("No se pudo enviar el mensaje a Telegram (chat_id=%s)", chat_id)
+
+
 @app.post("/telegram", tags=["telegram"], include_in_schema=False)
-def telegram(update: dict[str, Any] = Body(default_factory=dict)) -> dict:
-    # Por ahora solo confirma la recepción; se completa en la parte 5.
+def telegram(
+    request: Request,
+    update: dict[str, Any] = Body(default_factory=dict),
+    secreto: str | None = Header(default=None, alias="X-Telegram-Bot-Api-Secret-Token"),
+) -> dict:
+    # Solo Telegram conoce el secreto (se lo dimos en setWebhook): si no coincide, no viene de Telegram.
+    esperado = os.environ.get("TELEGRAM_SECRET", "")
+    if not esperado or not secreto or not hmac.compare_digest(secreto, esperado):
+        raise HTTPException(status_code=403, detail="Secreto de Telegram inválido.")
+
+    mensaje = update.get("message") or {}
+    texto = mensaje.get("text")
+    chat_id = (mensaje.get("chat") or {}).get("id")
+    if not texto or chat_id is None:
+        # Stickers, fotos, ediciones, etc.: se ignoran. Se responde 200 para que Telegram no reintente.
+        return {"ok": True}
+
+    config = {"configurable": {"thread_id": f"telegram-{chat_id}"}}
+    try:
+        estado = request.app.state.grafo.invoke({"mensaje": texto}, config)
+        respuesta = estado["respuesta"]
+    except Exception:
+        log.exception("Falló el grafo router para el chat de Telegram %s", chat_id)
+        respuesta = "Tuve un problema para responderte. Intenta de nuevo en unos segundos."
+
+    enviar_a_telegram(chat_id, respuesta)
     return {"ok": True}
