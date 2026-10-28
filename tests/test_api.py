@@ -78,8 +78,37 @@ def test_telegram_si_el_modelo_falla_avisa_al_usuario(cliente, telegram_falso, m
     assert telegram_falso[0][0] == 42 and "secreta" not in telegram_falso[0][1]
 
 
-def test_telegram_no_aparece_en_swagger(cliente):
-    assert "/telegram" not in cliente.get("/openapi.json").json()["paths"]
+def test_telegram_no_aparece_en_swagger(cliente, monkeypatch):
+    monkeypatch.setenv("DOCS_KEY", "clave-docs")
+    assert "/telegram" not in cliente.get("/openapi.json", auth=("admin", "clave-docs")).json()["paths"]
+
+
+@pytest.mark.parametrize("ruta", ["/docs", "/openapi.json"])
+def test_docs_sin_clave_da_401(cliente, monkeypatch, ruta):
+    monkeypatch.setenv("DOCS_KEY", "clave-docs")
+    r = cliente.get(ruta)
+    assert r.status_code == 401
+    assert r.headers["WWW-Authenticate"] == "Basic"  # así el navegador muestra la ventana de usuario y contraseña
+
+
+def test_docs_clave_incorrecta_da_401(cliente, monkeypatch):
+    monkeypatch.setenv("DOCS_KEY", "clave-docs")
+    assert cliente.get("/docs", auth=("admin", "otra")).status_code == 401
+
+
+def test_docs_sin_docs_key_configurada_queda_cerrado(cliente, monkeypatch):
+    monkeypatch.delenv("DOCS_KEY", raising=False)
+    assert cliente.get("/docs", auth=("admin", "")).status_code == 401
+
+
+def test_docs_con_clave_correcta(cliente, monkeypatch):
+    monkeypatch.setenv("DOCS_KEY", "clave-docs")
+    r = cliente.get("/docs", auth=("cualquiera", "clave-docs"))
+    assert r.status_code == 200 and "swagger" in r.text.lower()
+
+
+def test_redoc_desactivado(cliente):
+    assert cliente.get("/redoc").status_code == 404
 
 
 def test_si_el_modelo_falla_da_502_sin_detalles(cliente, monkeypatch):

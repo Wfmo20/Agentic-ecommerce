@@ -50,6 +50,7 @@ Completa `.env` (nunca lo subas al repositorio):
 | `TELEGRAM_TOKEN` | Token del bot, lo entrega BotFather | Paso de Telegram |
 | `TELEGRAM_SECRET` | Secreto que Telegram envía en cada webhook para que la API lo verifique | Paso de Telegram |
 | `PUBLIC_URL` | URL https pública de la app (la de Render) | Después de desplegar |
+| `DOCS_KEY` | Clave para abrir `/docs` (sin ella, la documentación queda cerrada) | Desde el inicio |
 
 ## 2. Correr el router en local (consola)
 
@@ -66,6 +67,8 @@ uvicorn api.app:app --reload --port 8000
 ```
 
 - Swagger: <http://localhost:8000/docs> → abre un endpoint → **Try it out** → **Execute**.
+  La documentación está protegida: el navegador pide **usuario** (cualquiera, ej. `admin`) y **contraseña**
+  (el valor de `DOCS_KEY`). `/openapi.json` también la pide y `/redoc` está desactivado.
 - Salud: <http://localhost:8000/health>
 
 | Método | Ruta | Qué hace |
@@ -139,7 +142,9 @@ Todo se hace desde el panel web de [Render](https://render.com) (plan **Free**, 
 4. Cuando diga **Live**, copia la URL (`https://NOMBRE-xxxx.onrender.com`, debajo del nombre del servicio)
    y agrégala como `PUBLIC_URL` en **Environment**.
 
-Prueba: `https://NOMBRE-xxxx.onrender.com/health` y `/docs`. En Bruno, elige el entorno `render`.
+Agrega también `DOCS_KEY` en **Environment** (sin ella, `/docs` queda cerrado).
+
+Prueba: `https://NOMBRE-xxxx.onrender.com/health` y `/docs` (pide usuario y la contraseña `DOCS_KEY`). En Bruno, elige el entorno `render`.
 Cada `git push` a `main` vuelve a desplegar solo; los errores se ven en **Logs**.
 
 > La memoria de las conversaciones (`MemorySaver`) vive en la RAM del servidor: se borra cuando Render

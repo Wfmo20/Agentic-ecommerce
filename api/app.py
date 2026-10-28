@@ -11,7 +11,10 @@ from typing import Any, Literal
 
 import httpx
 from dotenv import load_dotenv
-from fastapi import Body, FastAPI, Header, HTTPException, Request
+from fastapi import Body, Depends, FastAPI, Header, HTTPException, Request
+from fastapi.openapi.docs import get_swagger_ui_html
+from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from pydantic import BaseModel, Field
 
 load_dotenv()
@@ -98,7 +101,31 @@ app = FastAPI(
     description=DESCRIPCION,
     openapi_tags=TAGS,
     lifespan=lifespan,
+    # La documentación no es pública: /docs y /openapi.json se definen abajo, protegidos con DOCS_KEY.
+    docs_url=None,
+    redoc_url=None,
+    openapi_url=None,
 )
+
+
+# ---------- Documentación protegida ----------
+
+def verificar_docs(credenciales: HTTPBasicCredentials = Depends(HTTPBasic())) -> None:
+    """El navegador pide usuario y contraseña: la contraseña debe ser DOCS_KEY (el usuario puede ser cualquiera)."""
+    clave = os.environ.get("DOCS_KEY", "")
+    # Sin DOCS_KEY configurada, la documentación queda cerrada para todos.
+    if not clave or not hmac.compare_digest(credenciales.password.encode(), clave.encode()):
+        raise HTTPException(status_code=401, detail="Clave incorrecta.", headers={"WWW-Authenticate": "Basic"})
+
+
+@app.get("/openapi.json", include_in_schema=False, dependencies=[Depends(verificar_docs)])
+def openapi() -> JSONResponse:
+    return JSONResponse(app.openapi())
+
+
+@app.get("/docs", include_in_schema=False, dependencies=[Depends(verificar_docs)])
+def docs() -> HTMLResponse:
+    return get_swagger_ui_html(openapi_url="/openapi.json", title=f"{app.title} · docs")
 
 
 @app.get("/health", tags=["salud"], response_model=HealthResponse, summary="Estado de la API")
